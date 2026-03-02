@@ -28,23 +28,30 @@ def parse_guess(raw: str):
 
     return True, value, None
 
+# FIXME: This function does not give you the right response to your guess
 
 def check_guess(guess, secret):
-    if guess == secret:
-        return "Win", "🎉 Correct!"
-
+    # Ensure we compare numbers when possible.
     try:
-        if guess > secret:
-            return "Too High", "📈 Go HIGHER!"
-        else:
-            return "Too Low", "📉 Go LOWER!"
-    except TypeError:
-        g = str(guess)
-        if g == secret:
-            return "Win", "🎉 Correct!"
-        if g > secret:
-            return "Too High", "📈 Go HIGHER!"
-        return "Too Low", "📉 Go LOWER!"
+        secret_num = int(secret)
+    except (ValueError, TypeError):
+        try:
+            secret_num = int(float(str(secret)))
+        except Exception:
+            s_guess = str(guess)
+            s_secret = str(secret)
+            if s_guess == s_secret:
+                return "Win", "🎉 Correct!"
+            if s_guess > s_secret:
+                return "Too High", "📈 Go LOWER!"
+            return "Too Low", "📉 Go HIGHER!"
+
+    # Numeric comparison and proper hint wording.
+    if guess == secret_num:
+        return "Win", "🎉 Correct!"
+    if guess > secret_num:
+        return "Too High", "📈 Go LOWER!"
+    return "Too Low", "📉 Go HIGHER!"
 
 
 def update_score(current_score: int, outcome: str, attempt_number: int):
@@ -79,7 +86,7 @@ difficulty = st.sidebar.selectbox(
 
 attempt_limit_map = {
     "Easy": 6,
-    "Normal": 8,
+    "Normal": 7,
     "Hard": 5,
 }
 attempt_limit = attempt_limit_map[difficulty]
@@ -93,7 +100,9 @@ if "secret" not in st.session_state:
     st.session_state.secret = random.randint(low, high)
 
 if "attempts" not in st.session_state:
-    st.session_state.attempts = 1
+    # start at zero so the first guess counts as attempt #1 and we get the
+    # full number of allowed attempts according to the map.
+    st.session_state.attempts = 0
 
 if "score" not in st.session_state:
     st.session_state.score = 0
@@ -107,7 +116,7 @@ if "history" not in st.session_state:
 st.subheader("Make a guess")
 
 st.info(
-    f"Guess a number between 1 and 100. "
+    f"Guess a number between {low} and {high}. "
     f"Attempts left: {attempt_limit - st.session_state.attempts}"
 )
 
@@ -133,7 +142,8 @@ with col3:
 
 if new_game:
     st.session_state.attempts = 0
-    st.session_state.secret = random.randint(1, 100)
+    # regenerate secret using the current difficulty range
+    st.session_state.secret = random.randint(low, high)
     st.success("New game started.")
     st.rerun()
 
@@ -155,10 +165,8 @@ if submit:
     else:
         st.session_state.history.append(guess_int)
 
-        if st.session_state.attempts % 2 == 0:
-            secret = str(st.session_state.secret)
-        else:
-            secret = st.session_state.secret
+        # Always compare against the numeric secret value.
+        secret = st.session_state.secret
 
         outcome, message = check_guess(guess_int, secret)
 
